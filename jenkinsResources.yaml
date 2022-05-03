@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  This template Creates a Jenkis ecosystem that allow Jenkins run (preform pipeline operatiosn kike build, test and deploy, save artifacts to S3, etc).
+  Also provides access thru SSH for administration, and http access for final users
+Parameters:
+  ami:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Description: recomended ami by AWS
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
+  instanceType:
+    Description: Type of EC2 instance to launch for the server. Only Compute type nodes are currently specified.
+    Type: String
+    Default: t3.medium
+    ConstraintDescription: Must be a valid EC2 instance type. Listed just a few as this is an example
+    AllowedValues:
+      - t3.nano
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - m5.large
+      - m5.xlarge
+  jenkinsPort:
+    Description: The Port that will be used to access Jenkins.
+    Type: Number
+    Default: 8080
+  pemFileName:
+    Description: Name of an existing EC2 pem file to enable SSH access to the instance.
+    Type: AWS::EC2::KeyPair::KeyName
+  subnetListPublic:
+    Type: AWS::SSM::Parameter::Value<List<String>>
+    Description: The IDs of the public subnets in the Region
+    Default: /regionSettings/subnetListPublic
+
+Resources:
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ami
+      InstanceType: !Ref instanceType
+      KeyName: !Ref pemFileName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          DeleteOnTermination: true
+          SubnetId: !Select [0, !Ref subnetListPublic]
+          GroupSet:
+            - !Ref JenkinsSecurityGroup
+
+  JenkinsInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2JenkinsRole
+
+  JenkinsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0 # This must be more restrictive to include only Ansible Node
+        - IpProtocol: tcp
+          FromPort: !Ref jenkinsPort
+          ToPort: !Ref jenkinsPort
+          CidrIp: 0.0.0.0/0
+
+  Volume:
+    Type: AWS::EC2::Volume
+    Properties:
+      Size: 30
+      AvailabilityZone: !GetAtt Ec2Instance.AvailabilityZone
+
+  MountPoint:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      InstanceId: !Ref Ec2Instance
+      VolumeId: !Ref Volume
+      Device: /dev/sdh
+
+  EC2JenkinsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: ecs-service
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      AccessControl: PublicRead
+      BucketName: static-site-bucket
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: 404.html
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource: !Sub ${SiteBucket.Arn}/*
+            Principal: "*"
+          - Action:
+              - s3:PutObject
+            Effect: Allow
+            Resource: !Sub ${SiteBucket.Arn}/*
+            Principal:
+              AWS: !GetAtt EC2JenkinsRole.Arn
