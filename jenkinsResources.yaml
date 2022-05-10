@@ -45,6 +45,14 @@ Resources:
           SubnetId: !Select [0, !Ref subnetListPublic]
           GroupSet:
             - !Ref JenkinsSecurityGroup
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash -xe\n
+          mkdir /mnt/sdh\n
+          mkfs -t ext4 /dev/sdh\n
+          echo "/dev/sdh       /mnt/sdh   ext4    defaults,nofail 0       2" >> /etc/fstab\n
+          sudo mkdir /jenkins-data\n
+          sudo mount /dev/sdh /jenkins-data
 
   JenkinsInstanceProfile:
     Type: AWS::IAM::InstanceProfile
