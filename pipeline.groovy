@@ -1,10 +1,13 @@
 pipeline {
-     agent none
-     environment {
+    agent none
+    environment {
         TARGET_ENVIRONMENT = env.BRANCH_NAME == "dev" ? "dev":"prod"
         S3_BUCKET_NAME = env.BRANCH_NAME == "dev" ? env.S3_BUCKET_NAME_DEV:envS3_BUCKET_NAME_PROD
+     }
+    triggers {
+        cron('00 23 * * *') //run at 11 PM  for nightly builds
     }
-     stages {
+    stages {
         stage("Build") {
             agent { docker { image 'node:16.13.1-alpine' } }
             steps {
