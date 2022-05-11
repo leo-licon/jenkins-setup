@@ -1,0 +1,35 @@
+---
+- name: Play to install nginx
+  hosts: webserver
+  tasks:
+    - name: Install EPEL release for nginx
+      yum:
+        name: epel-release
+        state: present
+
+    - name: Install nginx web server
+      yum:
+        name: nginx
+        state: installed
+        update_cache: yes
+
+    - name: copy config file and start nginx
+      copy:
+        src: files/conf/static_site.cfg
+        dest: /etc/nginx/sites-available/static_site.cfg
+      become: yes
+      notify:
+        - start nginx
+
+    - name: Upload index file
+      copy: src=files/site/index.html dest=/usr/share/nginx/www/ mode=0644
+
+    - name: create symlink
+      file:
+        src: /etc/nginx/sites-available/static_site.cfg
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+      become: yes
+  handlers:
+    - name: start nginx
+      service: name=nginx enables=yes state=started
