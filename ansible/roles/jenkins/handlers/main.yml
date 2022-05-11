@@ -1,0 +1,9 @@
+---
+# handlers file for jenkins
+- name: Start jenkins
+  ansible.builtin.systemd:
+    name: jenkins
+    state: started
+- name: daemon-reload
+  ansible.builtin.systemd:
+    daemon_reload: yes

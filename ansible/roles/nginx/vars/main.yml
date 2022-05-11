@@ -1,0 +1,6 @@
+---
+# vars file for nginx
+package_name: nginx
+service_name: nginx
+config_file: files/conf/static_site.cfg
+config_file_dest: /etc/nginx/sites-available/static_site.cfg

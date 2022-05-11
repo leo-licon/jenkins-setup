@@ -1,0 +1,4 @@
+---
+# handlers file for nginx
+- name: start nginx
+  service: name="{{ service_name }}" enables=yes state=started

@@ -1,0 +1,5 @@
+---
+- name: Play to install nginx
+  hosts: webserver
+  roles: 
+    - nginx

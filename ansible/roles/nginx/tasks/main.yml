@@ -1,0 +1,30 @@
+---
+# tasks file for nginx
+- name: Install EPEL release for nginx
+  yum:
+    name: epel-release
+    state: present
+
+- name: Install nginx web server
+  yum:
+    name: "{{ package_name }}"
+    state: installed
+    update_cache: yes
+
+- name: copy config file and start nginx
+  copy:
+    src: "{{ config_file }}"
+    dest: "{{ config_file_dest }}"
+  become: yes
+  notify:
+    - start nginx
+
+- name: Upload index file
+  copy: src=files/site/index.html dest=/usr/share/nginx/www/ mode=0644
+
+- name: create symlink
+  file:
+    src: /etc/nginx/sites-available/static_site.cfg
+    dest: /etc/nginx/sites-enabled/default
+    state: link
+  become: yes
